@@ -964,6 +964,12 @@ func (s *DefaultStrategy) completeLogout(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	_, _ = s.revokeAuthenticationCookie(w, r, s.r.CookieStore()) // Cookie removal is optional
+
+	if err := s.r.ConsentManager().DeleteLoginSession(r.Context(), lr.SessionID); err != nil {
+		return nil, err
+	}
+
 	urls, err := s.generateFrontChannelLogoutURLs(r.Context(), lr.Subject, lr.SessionID)
 	if err != nil {
 		return nil, err
@@ -973,14 +979,11 @@ func (s *DefaultStrategy) completeLogout(w http.ResponseWriter, r *http.Request)
 		return nil, err
 	}
 
-	if err := s.revokeAuthenticationSession(w, r); err != nil {
-		return nil, err
-	}
-
 	s.r.AuditLogger().
 		WithRequest(r).
 		WithField("subject", lr.Subject).
 		Info("User logout completed!")
+
 	return &LogoutResult{
 		RedirectTo:             lr.PostLogoutRedirectURI,
 		FrontChannelLogoutURLs: urls,
